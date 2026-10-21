@@ -1,0 +1,31 @@
+{
+  "name": "splitbuddies",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:server": "tsx watch src/server/index.ts",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
+    "db:migrate": "tsx src/server/db/migrate.ts",
+    "build": "tsc && vite build && npm run build:server",
+    "build:server": "tsc -p tsconfig.server.json",
+    "start": "node dist-server/index.js",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.5.1",
+    "concurrently": "^10.0.5",
+    "tsx": "^4.23.13",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/static": "^10.1.6",
+    "argon2": "^0.45.1",
+    "better-sqlite3": "^13.0.3",
+    "fastify": "^5.12.4"
+  }
+}
