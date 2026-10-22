@@ -23,16 +23,18 @@ db.exec(`
 const migrationsDir = join(import.meta.dirname, 'migrations');
 
 const files = readdirSync(migrationsDir)
-    .filter((file) => file.endsWith('.ts'))
+    .filter((file) => file.endsWith('.ts') || file.endsWith('.js'))
     .sort();
 
 for (const filename of files) {
+    const migrationName = filename.replace(/\.(ts|js)$/, '');
+
     const alreadyApplied = db.prepare(`
         SELECT 1
         FROM schema_migrations
-        WHERE filename = ?
+        WHERE filename IN (?, ?, ?)
     `)
-    .get(filename);
+    .get(migrationName, `${migrationName}.ts`, `${migrationName}.js`);
 
     if(alreadyApplied) {
         continue;

@@ -1,0 +1,13 @@
+
+node_modules
+dist
+dist-server
+.git
+.env
+.env.*
+!.env.example
+data
+*.sqlite
+*.sqlite-*
+*.db
+npm-debug.log*
