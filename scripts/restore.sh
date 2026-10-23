@@ -283,7 +283,7 @@ try {
                     if (body.status !== "ok" || body.database !== "ok") {
                         throw new Error("Application or database health check failed");
                     }
-                } 
+                }
                 catch (error) {
                     console.error(error);
                     process.exitCode = 1;

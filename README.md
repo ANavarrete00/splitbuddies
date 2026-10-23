@@ -138,6 +138,57 @@ SQLite may use write-ahead logging (WAL), so copying only the live database file
 
 A backup and restore procedure has been tested in the development environment. A SQLite online backup was created using `better-sqlite3`, verified with an integrity check, and restored to a separate database file. The restored database retained the test user and migration records.
 
+### Database Backup and Restore
+
+The repository includes scripts for creating and restoring SQLite database backups. Run these scripts manually from the project root on the host where Podman is running.
+
+#### Create a backup
+
+```bash
+./scripts/backup.sh
+```
+
+By default, backups are saved to `~/splitbuddies-backups/`. The backup script uses SQLite's online backup API, verifies the backup with `integrity_check`, and applies restrictive file permissions.
+
+To choose a different backup directory, set `SPLITBUDDIES_BACKUP_DIR`:
+
+```bash
+SPLITBUDDIES_BACKUP_DIR=/path/to/backups ./scripts/backup.sh
+```
+
+#### Restore a backup
+
+List available backups:
+
+```bash
+ls -lh ~/splitbuddies-backups/
+```
+
+Pass the path of the backup you want to restore to the restore script:
+
+```bash
+./scripts/restore.sh ~/splitbuddies-backups/splitbuddies-YYYYMMDD-HHMMSS.sqlite
+```
+
+Replace the example filename with the actual backup filename.
+
+**Restore precautions:**
+
+- The script asks you to type `RESTORE` to confirm the operation.
+- It creates a safety backup of the current database before replacing it.
+- It validates the selected backup before installation.
+- It attempts to restore the previous database if the application fails its post-restore health check.
+- Do not interrupt the restore process or manually delete database files while it is running.
+- Verify that the application is healthy after the restore completes.
+
+The restore script targets the `splitbuddies` container by default. To target a differently named container, set `SPLITBUDDIES_CONTAINER`.
+
+#### Backup recommendations
+
+Keep backups outside the container's writable layer. For disaster recovery, periodically copy backups to storage separate from the application host.
+
+A successful backup does not guarantee a successful restore. Test restores periodically and retain safety backups until the restored application has been verified.
+
 ## Reverse Proxy and HTTPS
 
 Split Buddies has been tested behind Caddy in the development environment.
