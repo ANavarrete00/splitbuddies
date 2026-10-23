@@ -136,7 +136,7 @@ Compose mounts a named volume called `splitbuddies_data` at `/data`. This keeps 
 
 SQLite may use write-ahead logging (WAL), so copying only the live database file is not always a complete or consistent backup. Use a SQLite-aware backup method or a coordinated shutdown procedure.
 
-A tested backup and restore procedure is planned.
+A backup and restore procedure has been tested in the development environment. A SQLite online backup was created using `better-sqlite3`, verified with an integrity check, and restored to a separate database file. The restored database retained the test user and migration records.
 
 ## Reverse Proxy and HTTPS
 
@@ -158,12 +158,18 @@ The following have been tested in the development environment:
 - The health endpoint reports a healthy database.
 - The application is accessible from another device on the home LAN.
 - Caddy successfully proxies requests to the application.
+- A SQLite online backup completes successfully while the application is running.
+- The backup passes SQLite's `integrity_check` and contains the expected tables, user data, and migration records.
+- The backup can be restored to a separate database file with its data preserved.
+- The restored database can be used by an isolated application container with a separate named volume and host port.
+- Both the restored instance and the original application return a healthy response from `/api/health`.
+- The application shuts down gracefully on SIGTERM, allowing Fastify to close and SQLite to release its database connection.
 
 Further validation is planned for:
 
-- Consistent database backup and restore.
-- Restore testing with an isolated container and volume.
+- Backup retention and copying backups to storage separate from the application host.
 - Safe upgrades and migration recovery.
+- Restore testing on the eventual Proxmox deployment.
 
 ## Security Notes
 

@@ -29,6 +29,37 @@ import { NotificationsService } from './services/notification.service.ts';
 import { NotificationsRoutes } from './routes/notifications.routes.ts';
 
 const server = Fastify({logger: true,});
+server.addHook('onClose', async () => {
+    if(db.open) {
+        db.close();
+    }
+});
+
+let shuttingDown = false;
+
+async function shutdown(signal: NodeJS.Signals): Promise<void> {
+    if(shuttingDown) {
+        return;
+    }
+
+    shuttingDown = true;
+    server.log.info(`Received ${signal}; shutting down gracefully`);
+
+    try{
+        await server.close();
+    }
+    catch(error) {
+        server.log.error(error, 'Error during graceful shutdown');
+        process.exitCode = 1;
+    }
+}
+
+process.once('SIGTERM', () => {
+    void shutdown('SIGTERM');
+});
+process.once('SIGINT', () => {
+    void shutdown('SIGINT');
+});
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '127.0.0.1';
