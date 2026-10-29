@@ -74,6 +74,9 @@ The example configuration includes these variables:
 | `APP_PORT`     | `3000`    | Port used by the application inside the container |
 | `HOST_PORT`    | `5274`    | Host port published for application access        |
 | `BIND_ADDRESS` | `0.0.0.0` | Host interface used for the published port        |
+| `TRUST_PROXY`  | *(empty)* | Trusted reverse-proxy IP address(es) or CIDR subnet(s) |
+
+Leave `TRUST_PROXY` empty when the application is not behind a reverse proxy. When using a reverse proxy, set it to the IP address or CIDR subnet of the trusted proxy as seen by the application. Multiple entries can be comma-separated. Only trust proxies that handle forwarded client-IP headers safely.
 
 For example, to publish the application on host port `8080` instead, set `HOST_PORT=8080` in `.env`. The application can continue listening on port `3000` inside the container.
 
@@ -206,6 +209,9 @@ The deployment administrator is responsible for choosing a backup policy, includ
 Split Buddies has been tested behind Caddy in the development environment.
 
 For a production deployment, a reverse proxy can handle HTTPS and forward requests to the application. Configure the proxy's upstream address and port to match the actual container networking and published-port configuration.
+
+When deploying behind a reverse proxy, configure `TRUST_PROXY` in the deployment's `.env` file with the trusted proxy IP address or CIDR subnet. Leave it empty when proxy trust is not needed. Fastify uses this setting to determine client IP addresses from forwarded headers, which affects IP-based authentication rate limits. The configured address must match the proxy's source address as seen by the application. Only trust proxies that safely set or sanitize forwarded client-IP headers, and restrict direct application access where practical.
+
 > [!NOTE]
 >
 > Use HTTPS for real deployments to avoid exposing the application.

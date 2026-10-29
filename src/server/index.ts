@@ -30,7 +30,14 @@ import { NotificationsRepository } from './repositories/notifications.repository
 import { NotificationsService } from './services/notification.service.ts';
 import { NotificationsRoutes } from './routes/notifications.routes.ts';
 
-const server = Fastify({logger: true,});
+const trustedProxyAddresses = (process.env.TRUST_PROXY ?? '').split(',').map((address) => address.trim()).filter((address) => address.length > 0);
+
+const server = Fastify({
+    logger: true,
+    trustProxy: trustedProxyAddresses.length > 0
+        ? trustedProxyAddresses
+        : false,
+});
 server.addHook('onClose', async () => {
     if(db.open) {
         db.close();
