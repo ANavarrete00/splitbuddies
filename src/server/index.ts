@@ -5,6 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fastifyStatic from '@fastify/static';
 
+import rateLimit from '@fastify/rate-limit';
+
 import { db } from './db/database.ts';
 import { authRoutes } from './routes/auth.routes.js';
 
@@ -28,7 +30,14 @@ import { NotificationsRepository } from './repositories/notifications.repository
 import { NotificationsService } from './services/notification.service.ts';
 import { NotificationsRoutes } from './routes/notifications.routes.ts';
 
-const server = Fastify({logger: true,});
+const trustedProxyAddresses = (process.env.TRUST_PROXY ?? '').split(',').map((address) => address.trim()).filter((address) => address.length > 0);
+
+const server = Fastify({
+    logger: true,
+    trustProxy: trustedProxyAddresses.length > 0
+        ? trustedProxyAddresses
+        : false,
+});
 server.addHook('onClose', async () => {
     if(db.open) {
         db.close();
@@ -94,6 +103,10 @@ const expenseService = new ExpenseService(expensesRepository, groupsRepository, 
 const start = async () => {
     try {
         await server.register(cookie);
+
+        await server.register(rateLimit, {
+            global: false,
+        });
 
         await server.register(authRoutes);
 

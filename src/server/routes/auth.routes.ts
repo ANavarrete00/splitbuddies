@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { login, register, logout, changeUsername, changePassword} from '../services/auth.service.js';
 
 import { authenticate } from '../auth/middleware.js';
+import { authRateLimitConfig } from '../config/rate-limit.js';
 
 const SESSION_COOKIE_NAME = 'sb_session';
 
@@ -24,6 +25,9 @@ export async function authRoutes(server: FastifyInstance): Promise<void> {
             password: string;
         };
     }>('/api/auth/register', {
+        config: {
+            rateLimit: authRateLimitConfig.register,
+        },
         schema: {
             body: {
                 type: 'object',
@@ -89,6 +93,9 @@ export async function authRoutes(server: FastifyInstance): Promise<void> {
             password: string;
         };
     }>('/api/auth/login', {
+        config: {
+            rateLimit: authRateLimitConfig.login,
+        },
         schema: {
             body: {
                 type: 'object',

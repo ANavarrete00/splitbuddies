@@ -74,6 +74,9 @@ The example configuration includes these variables:
 | `APP_PORT`     | `3000`    | Port used by the application inside the container |
 | `HOST_PORT`    | `5274`    | Host port published for application access        |
 | `BIND_ADDRESS` | `0.0.0.0` | Host interface used for the published port        |
+| `TRUST_PROXY`  | *(empty)* | Trusted reverse-proxy IP address(es) or CIDR subnet(s) |
+
+Leave `TRUST_PROXY` empty when the application is not behind a reverse proxy. When using a reverse proxy, set it to the IP address or CIDR subnet of the trusted proxy as seen by the application. Multiple entries can be comma-separated. Only trust proxies that handle forwarded client-IP headers safely.
 
 For example, to publish the application on host port `8080` instead, set `HOST_PORT=8080` in `.env`. The application can continue listening on port `3000` inside the container.
 
@@ -189,15 +192,46 @@ Keep backups outside the container's writable layer. For disaster recovery, peri
 
 A successful backup does not guarantee a successful restore. Test restores periodically and retain safety backups until the restored application has been verified.
 
+## Backup Policy
+
+Backups are manual by default. Split Buddies does not configure a scheduler or automatically manage backup retention. Administrators can optionally schedule the backup script using host-level scheduling tools or deployment-specific automation appropriate to their environment.
+
+The deployment administrator is responsible for choosing a backup policy, including:
+
+- Scheduling: Decide how frequently backups should run based on how much data could reasonably be lost.
+- Retention: Define how many backups to keep and remove older backups safely.
+- Off-host storage: Periodically copy backups to storage separate from the application host to protect against host failure.
+- Permissions: Restrict access to backup files because they contain application data.
+- Recovery testing: Periodically test restoring a backup and verify that the application and restored data work as expected.
+
 ## Reverse Proxy and HTTPS
 
 Split Buddies has been tested behind Caddy in the development environment.
 
 For a production deployment, a reverse proxy can handle HTTPS and forward requests to the application. Configure the proxy's upstream address and port to match the actual container networking and published-port configuration.
 
+When deploying behind a reverse proxy, configure `TRUST_PROXY` in the deployment's `.env` file with the trusted proxy IP address or CIDR subnet. Leave it empty when proxy trust is not needed. Fastify uses this setting to determine client IP addresses from forwarded headers, which affects IP-based authentication rate limits. The configured address must match the proxy's source address as seen by the application. Only trust proxies that safely set or sanitize forwarded client-IP headers, and restrict direct application access where practical.
+
 > [!NOTE]
 >
 > Use HTTPS for real deployments to avoid exposing the application.
+
+### Authentication Rate Limits
+
+Split Buddies applies rate limits to login and registration endpoints to help reduce automated abuse.
+
+The defaults are:
+
+| Environment variable | Default | Description |
+| --- | --- | --- |
+| `AUTH_LOGIN_RATE_LIMIT_MAX` | `10` | Login requests allowed per window |
+| `AUTH_LOGIN_RATE_LIMIT_WINDOW` | `1 minute` | Login rate-limit window |
+| `AUTH_REGISTER_RATE_LIMIT_MAX` | `5` | Registration requests allowed per window |
+| `AUTH_REGISTER_RATE_LIMIT_WINDOW` | `1 hour` | Registration rate-limit window |
+
+Set these variables in your `.env` file to customize the limits. Windows accept positive durations such as `30 seconds`, `5 minutes`, or `2 hours`. Invalid values prevent the server from starting.
+
+Rate-limit counters are stored in memory. They reset when the server restarts and are not shared across multiple application instances. When deploying behind a reverse proxy, configure client IP handling carefully so that IP-based limits behave as intended.
 
 ## Deployment Status
 

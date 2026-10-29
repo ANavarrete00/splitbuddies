@@ -12,6 +12,7 @@ services:
       HOST: 0.0.0.0
       PORT: ${APP_PORT:-3000}
       DATABASE_PATH: /data/splitbuddies.sqlite
+      TRUST_PROXY: ${TRUST_PROXY:-}
 
     ports:
       - "${BIND_ADDRESS:-0.0.0.0}:${HOST_PORT:-5274}:${APP_PORT:-3000}"
