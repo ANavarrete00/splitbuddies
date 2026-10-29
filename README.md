@@ -189,15 +189,43 @@ Keep backups outside the container's writable layer. For disaster recovery, peri
 
 A successful backup does not guarantee a successful restore. Test restores periodically and retain safety backups until the restored application has been verified.
 
+## Backup Policy
+
+Backups are manual by default. Split Buddies does not configure a scheduler or automatically manage backup retention. Administrators can optionally schedule the backup script using host-level scheduling tools or deployment-specific automation appropriate to their environment.
+
+The deployment administrator is responsible for choosing a backup policy, including:
+
+- Scheduling: Decide how frequently backups should run based on how much data could reasonably be lost.
+- Retention: Define how many backups to keep and remove older backups safely.
+- Off-host storage: Periodically copy backups to storage separate from the application host to protect against host failure.
+- Permissions: Restrict access to backup files because they contain application data.
+- Recovery testing: Periodically test restoring a backup and verify that the application and restored data work as expected.
+
 ## Reverse Proxy and HTTPS
 
 Split Buddies has been tested behind Caddy in the development environment.
 
 For a production deployment, a reverse proxy can handle HTTPS and forward requests to the application. Configure the proxy's upstream address and port to match the actual container networking and published-port configuration.
-
 > [!NOTE]
 >
 > Use HTTPS for real deployments to avoid exposing the application.
+
+### Authentication Rate Limits
+
+Split Buddies applies rate limits to login and registration endpoints to help reduce automated abuse.
+
+The defaults are:
+
+| Environment variable | Default | Description |
+| --- | --- | --- |
+| `AUTH_LOGIN_RATE_LIMIT_MAX` | `10` | Login requests allowed per window |
+| `AUTH_LOGIN_RATE_LIMIT_WINDOW` | `1 minute` | Login rate-limit window |
+| `AUTH_REGISTER_RATE_LIMIT_MAX` | `5` | Registration requests allowed per window |
+| `AUTH_REGISTER_RATE_LIMIT_WINDOW` | `1 hour` | Registration rate-limit window |
+
+Set these variables in your `.env` file to customize the limits. Windows accept positive durations such as `30 seconds`, `5 minutes`, or `2 hours`. Invalid values prevent the server from starting.
+
+Rate-limit counters are stored in memory. They reset when the server restarts and are not shared across multiple application instances. When deploying behind a reverse proxy, configure client IP handling carefully so that IP-based limits behave as intended.
 
 ## Deployment Status
 

@@ -5,6 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fastifyStatic from '@fastify/static';
 
+import rateLimit from '@fastify/rate-limit';
+
 import { db } from './db/database.ts';
 import { authRoutes } from './routes/auth.routes.js';
 
@@ -94,6 +96,10 @@ const expenseService = new ExpenseService(expensesRepository, groupsRepository, 
 const start = async () => {
     try {
         await server.register(cookie);
+
+        await server.register(rateLimit, {
+            global: false,
+        });
 
         await server.register(authRoutes);
 
