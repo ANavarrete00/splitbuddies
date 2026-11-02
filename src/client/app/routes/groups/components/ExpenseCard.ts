@@ -2,6 +2,7 @@ import type { Expense } from '../../../../api/expenses';
 import type { GroupMember } from '../../../../api/groups';
 
 import { ExpenseExclusions } from './ExpenseExclusions';
+import { setupExpenseTaxInputs } from './ExpenseTaxInputs';
 
 export class ExpenseCard {
     private readonly groupMembers: GroupMember[];
@@ -49,6 +50,7 @@ export class ExpenseCard {
 
     setupExclusionInputs(form: HTMLFormElement): void {
         this.expenseExclusions.setupInputs(form);
+        setupExpenseTaxInputs(form);
     }
 
     getExclusions(form: HTMLFormElement): {user_id: string; amount_cents: number;}[] {
