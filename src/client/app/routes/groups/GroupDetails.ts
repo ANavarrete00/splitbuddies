@@ -681,8 +681,8 @@ export class GroupDetails {
                 : Math.round(Number(taxRate) * 100);
 
             if(
-                !Number.isFinite(excludedAmountCents) || excludedAmountCents < 0 || excludedAmountCents > amountCents) {
-                this.expenseError = 'Excluded amount cannot be greater than the expense amount.';
+                !Number.isFinite(excludedAmountCents) || excludedAmountCents < 0 || excludedAmountCents > amountCents - taxCents) {
+                this.expenseError = 'Excluded amount cannot be greater than the pre-tax subtotal.';
                 this.expenseMessage = '';
                 this.onChange();
 
@@ -979,6 +979,10 @@ export class GroupDetails {
                     ...this.selectedGroupMembers,
                     ...addedMembers,
                 ];
+
+                // Expense card and form need to be updated with the added members.
+                this.expenseCard = new ExpenseCard(this.selectedGroupMembers);
+                this.expenseForm = new ExpenseForm(this.selectedGroupMembers);
 
                 // Update balance after adding members
                 await this.refreshGroupBalances();
@@ -1294,8 +1298,8 @@ export class GroupDetails {
             ? undefined
             : Math.round(Number(taxRate) * 100);
 
-        if(!Number.isFinite(excludedAmountCents) || excludedAmountCents < 0 || excludedAmountCents > amountCents) {
-            this.expenseError = 'Excluded amount cannot be greater than the expense amount.';
+        if(!Number.isFinite(excludedAmountCents) || excludedAmountCents < 0 || excludedAmountCents > amountCents - taxCents) {
+            this.expenseError = 'Excluded amount cannot be greater than the pre-tax subtotal.';
             this.onChange();
 
             return;

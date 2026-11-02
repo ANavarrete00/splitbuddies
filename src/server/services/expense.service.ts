@@ -142,7 +142,7 @@ export class ExpenseService {
 		const excludedAmountCents = input.excludedAmountCents ?? 0;
 		if(!Number.isInteger(excludedAmountCents) ||
 			excludedAmountCents < 0 ||
-			excludedAmountCents > input.amountCents
+			excludedAmountCents > input.amountCents - (input.taxCents ?? 0)
 		) {
 			throw new Error('Invalid excluded expense amount');
 		}
@@ -315,7 +315,7 @@ export class ExpenseService {
 		const excludedAmountCents = input.excludedAmountCents ?? 0;
 		if(!Number.isInteger(excludedAmountCents) ||
 			excludedAmountCents < 0 ||
-			excludedAmountCents > input.amountCents
+			excludedAmountCents > input.amountCents - (input.taxCents ?? 0)
 		) {
 			throw new Error('Invalid excluded expense amount');
 		}

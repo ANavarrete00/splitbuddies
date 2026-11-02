@@ -4,7 +4,6 @@ services:
     build:
       context: .
     image: splitbuddies:local
-    container_name: splitbuddies
     restart: unless-stopped
 
     environment:

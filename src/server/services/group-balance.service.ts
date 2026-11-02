@@ -80,11 +80,26 @@ export class GroupBalanceService {
 			);
 
 			const excludedAmountCents = expense.excluded_amount_cents;
+			const subtotalCents = expense.amount_cents - expense.tax_cents;
+			const exclusions = expense.exclusions ?? [];
 
-			// The excluded portion is assigned directly to its specified
-			// debtors and therefore does not participate in the normal
-			// percentage-based split.
-			for(const exclusion of expense.exclusions ?? []) {
+			// Calculate the tax attributable to the excluded portion.
+			const excludedTaxCents = subtotalCents > 0
+				? Math.round(expense.tax_cents * excludedAmountCents / subtotalCents)
+				: 0;
+
+			// Allocate that tax proportionally among the assigned members.
+			const excludedTaxMember = this.allocateWeightedAmount(
+				excludedTaxCents,
+				exclusions.map((exclusion) => ({
+					userId: exclusion.user_id,
+					weight: exclusion.amount_cents,
+				})),
+			);
+
+			// The excluded portion, including its proportional tax, is assigned directly to its specified
+			// debtors and therefore does not participate in the normal percentage-based split.
+			for(const exclusion of exclusions) {
 				if(!memberIds.has(exclusion.user_id)) {
 					throw new Error(
 						`Expense exclusion member ${exclusion.user_id} is not a member of the group`,
@@ -93,11 +108,12 @@ export class GroupBalanceService {
 
 				excludedShareByMember.set(
 					exclusion.user_id,
-					excludedShareByMember.get(exclusion.user_id)! + exclusion.amount_cents,
+					excludedShareByMember.get(exclusion.user_id)! + exclusion.amount_cents + (excludedTaxMember.get(exclusion.user_id) ?? 0),
 				);
 			}
 
-			includedAmountCents += expense.amount_cents - excludedAmountCents;
+			// Only the remaining amount participates in the normal group split.
+			includedAmountCents += expense.amount_cents - excludedAmountCents - excludedTaxCents;
 		}
 
 		const fairShareByMember = this.allocatePercentageAmount(includedAmountCents, members, sharePercentages);
@@ -213,6 +229,55 @@ export class GroupBalanceService {
 				allocations.get(userId)! + 1,
 			);
 
+			remainingCents--;
+		}
+
+		return allocations;
+	}
+
+	private allocateWeightedAmount(amountCents: number, weights: Array<{userId: string; weight: number}>): Map<string, number> {
+		const allocations = new Map<string, number>();
+		const fractionalRemainders: Array<{userId: string; remainder: number}> = [];
+
+		const totalWeight = weights.reduce(
+			(total, item) => total + item.weight,
+			0,
+		);
+
+		if(amountCents <= 0 || totalWeight <= 0) {
+			return allocations;
+		}
+
+		let allocatedCents = 0;
+
+		for(const item of weights) {
+			const numerator = amountCents * item.weight;
+			const cents = Math.floor(numerator / totalWeight);
+			const remainder = numerator % totalWeight;
+
+			allocations.set(item.userId, cents);
+			fractionalRemainders.push({
+				userId: item.userId,
+				remainder,
+			});
+
+			allocatedCents += cents;
+		}
+
+		let remainingCents = amountCents - allocatedCents;
+
+		fractionalRemainders.sort((a, b) => {
+			if(b.remainder !== a.remainder) {
+				return b.remainder - a.remainder;
+			}
+
+			return a.userId.localeCompare(b.userId);
+		});
+
+		for(let i = 0; i < fractionalRemainders.length && remainingCents > 0; i++) {
+			const userId = fractionalRemainders[i].userId;
+
+			allocations.set(userId, allocations.get(userId)! + 1);
 			remainingCents--;
 		}
 
