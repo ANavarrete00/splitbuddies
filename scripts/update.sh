@@ -95,17 +95,97 @@ NODE
     log "Backup test completed successfully."
 }
 
+run_container_lookup_test() {
+    log "Testing Podman container discovery."
+
+    local MOCK_SCENARIO
+    local result
+
+    # Mock Podman's ps command. No real containers are accessed.
+    podman() {
+        local project_filter=""
+        local service_filter=""
+
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --filter)
+                    case "$2" in
+                        label=io.podman.compose.project=*)
+                            project_filter="${2#label=}"
+                            ;;
+                        label=com.docker.compose.project=*)
+                            project_filter="${2#label=}"
+                            ;;
+                        label=io.podman.compose.service=*)
+                            service_filter="${2#label=}"
+                            ;;
+                        label=com.docker.compose.service=*)
+                            service_filter="${2#label=}"
+                            ;;
+                    esac
+                    shift 2
+                    ;;
+                *)
+                    shift
+                    ;;
+            esac
+        done
+
+        case "$MOCK_SCENARIO:$project_filter:$service_filter" in
+            docker:com.docker.compose.project=splitbuddies:com.docker.compose.service=splitbuddies)
+                printf 'docker-container-id\n'
+                ;;
+            podman:io.podman.compose.project=splitbuddies:io.podman.compose.service=splitbuddies)
+                printf 'podman-container-id\n'
+                ;;
+            both:io.podman.compose.project=splitbuddies:io.podman.compose.service=splitbuddies|both:io.podman.compose.project=splitbuddies:com.docker.compose.service=splitbuddies|both:com.docker.compose.project=splitbuddies:io.podman.compose.service=splitbuddies|both:com.docker.compose.project=splitbuddies:com.docker.compose.service=splitbuddies)
+                printf 'shared-container-id\n'
+                ;;
+            multiple:io.podman.compose.project=splitbuddies:io.podman.compose.service=splitbuddies)
+                printf 'container-one\n'
+                ;;
+            multiple:com.docker.compose.project=splitbuddies:com.docker.compose.service=splitbuddies)
+                printf 'container-two\n'
+                ;;
+        esac
+    }
+
+    ENGINE="podman"
+    PROJECT_NAME="splitbuddies"
+    SERVICE="splitbuddies"
+
+    MOCK_SCENARIO="docker"
+    result="$(get_container_id)"
+    [[ "$result" == "docker-container-id" ]] ||
+        fail "Docker-compatible label lookup test failed."
+
+    MOCK_SCENARIO="podman"
+    result="$(get_container_id)"
+    [[ "$result" == "podman-container-id" ]] ||
+        fail "Podman-specific label lookup test failed."
+
+    MOCK_SCENARIO="both"
+    result="$(get_container_id)"
+    [[ "$result" == "shared-container-id" ]] ||
+        fail "Duplicate container ID test failed."
+
+    MOCK_SCENARIO="empty"
+    result="$(get_container_id)"
+    [[ -z "$result" ]] ||
+        fail "Empty container lookup test failed."
+
+    MOCK_SCENARIO="multiple"
+    if result="$(get_container_id 2>/dev/null)"; then
+        fail "Multiple container lookup should have failed."
+    fi
+
+    unset -f podman
+
+    log "Container discovery tests completed successfully."
+}
+
 # Always run from the repository root.
 cd "$SCRIPT_DIR"
-
-if [[ "${1:-}" == "--test" ]]; then
-    run_backup_test
-    exit 0
-fi
-
-if [[ $# -gt 0 ]]; then
-    fail "Unknown argument: $1. Use --test or run without arguments to update."
-fi
 
 # Confirm this is the application repository.
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 ||
@@ -132,14 +212,69 @@ compose() {
 }
 
 get_container_id() {
+    local -a matches=()
+    local -a unique_matches=()
+    local -A seen=()
+    local project_label
+    local service_label
+    local container_id
+
     if [[ "$ENGINE" == "podman" ]]; then
-        podman ps -q \
-            --filter "label=io.podman.compose.project=$PROJECT_NAME" \
-            --filter "label=io.podman.compose.service=$SERVICE"
+        # Podman Compose versions may use either label convention.
+        for project_label in \
+            "io.podman.compose.project" \
+            "com.docker.compose.project"; do
+            for service_label in \
+                "io.podman.compose.service" \
+                "com.docker.compose.service"; do
+
+                while IFS= read -r container_id; do
+                    [[ -n "$container_id" ]] &&
+                        matches+=("$container_id")
+                done < <(
+                    podman ps -q \
+                        --filter "label=$project_label=$PROJECT_NAME" \
+                        --filter "label=$service_label=$SERVICE"
+                )
+            done
+        done
     else
-        compose ps -q "$SERVICE"
+        while IFS= read -r container_id; do
+            [[ -n "$container_id" ]] &&
+                matches+=("$container_id")
+        done < <(compose ps -q "$SERVICE")
     fi
+
+    # Remove duplicates in case a container has both label conventions.
+    for container_id in "${matches[@]}"; do
+        if [[ -z "${seen[$container_id]+x}" ]]; then
+            seen["$container_id"]=1
+            unique_matches+=("$container_id")
+        fi
+    done
+
+    case "${#unique_matches[@]}" in
+        0)
+            printf ''
+            ;;
+        1)
+            printf '%s\n' "${unique_matches[0]}"
+            ;;
+        *)
+            fail "Found multiple running $SERVICE containers. Refusing to choose one."
+            ;;
+    esac
 }
+
+if [[ "${1:-}" == "--test" ]]; then
+    run_backup_test
+    run_container_lookup_test
+    exit 0
+fi
+
+if [[ $# -gt 0 ]]; then
+    fail "Unknown argument: $1. Use --test or run without arguments to update."
+fi
 
 # Only update a clean main checkout.
 CURRENT_BRANCH="$(git branch --show-current)"
