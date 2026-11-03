@@ -3,6 +3,8 @@ set -Eeuo pipefail
 
 SERVICE="splitbuddies"
 BRANCH="main"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(basename "$SCRIPT_DIR")}"
 BACKUP_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/splitbuddies/backups"
 
 log() {
@@ -94,7 +96,6 @@ NODE
 }
 
 # Always run from the repository root.
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
 if [[ "${1:-}" == "--test" ]]; then
@@ -130,6 +131,16 @@ compose() {
     "${COMPOSE[@]}" "$@"
 }
 
+get_container_id() {
+    if [[ "$ENGINE" == "podman" ]]; then
+        podman ps -q \
+            --filter "label=io.podman.compose.project=$PROJECT_NAME" \
+            --filter "label=io.podman.compose.service=$SERVICE"
+    else
+        compose ps -q "$SERVICE"
+    fi
+}
+
 # Only update a clean main checkout.
 CURRENT_BRANCH="$(git branch --show-current)"
 [[ "$CURRENT_BRANCH" == "$BRANCH" ]] ||
@@ -145,13 +156,20 @@ git merge-base --is-ancestor HEAD "origin/$BRANCH" ||
 
 # The existing application container must be running so SQLite can make
 # a consistent online backup using better-sqlite3.
-CONTAINER_ID="$(compose ps -q "$SERVICE")"
+CONTAINER_ID="$(get_container_id)"
 [[ -n "$CONTAINER_ID" ]] ||
     fail "The $SERVICE container is not running. Start it before updating."
 
 TIMESTAMP="$(date '+%Y%m%d-%H%M%S')-$$"
 CONTAINER_BACKUP="/data/splitbuddies-backup-${TIMESTAMP}.sqlite"
 HOST_BACKUP="$BACKUP_DIR/splitbuddies-${TIMESTAMP}.sqlite"
+
+cleanup_container_backup() {
+    "$ENGINE" exec "$CONTAINER_ID" rm -f "$CONTAINER_BACKUP" \
+        >/dev/null 2>&1 || true
+}
+
+trap cleanup_container_backup EXIT
 
 log "Creating a consistent SQLite backup."
 mkdir -p "$BACKUP_DIR"
@@ -170,13 +188,6 @@ db.backup(destination)
     process.exit(1);
   });
 ' "$CONTAINER_BACKUP"
-
-cleanup_container_backup() {
-    "$ENGINE" exec "$CONTAINER_ID" rm -f "$CONTAINER_BACKUP" \
-        >/dev/null 2>&1 || true
-}
-
-trap cleanup_container_backup EXIT
 
 log "Verifying the database backup inside the container."
 "$ENGINE" exec "$CONTAINER_ID" node - "$CONTAINER_BACKUP" <<'NODE'
@@ -219,7 +230,7 @@ log "Waiting for the application health check."
 HEALTH_STATUS="unknown"
 
 for attempt in $(seq 1 30); do
-    CONTAINER_ID="$(compose ps -q "$SERVICE")"
+    CONTAINER_ID="$(get_container_id)"
 
     if [[ -n "$CONTAINER_ID" ]]; then
         HEALTH_STATUS="$(
