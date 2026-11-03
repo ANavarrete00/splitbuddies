@@ -309,7 +309,7 @@ trap cleanup_container_backup EXIT
 log "Creating a consistent SQLite backup."
 mkdir -p "$BACKUP_DIR"
 
-compose exec -T "$SERVICE" node -e '
+"$ENGINE" exec "$CONTAINER_ID" node -e '
 const Database = require("better-sqlite3");
 const source = process.env.DATABASE_PATH || "/data/splitbuddies.sqlite";
 const destination = process.argv[1];
